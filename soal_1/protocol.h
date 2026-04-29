@@ -22,7 +22,35 @@ char ip[20];
 int port;
 } Config;
 
-void get_config (Config *config, const char *filename);
-void log_event (const char *tag, const char *message);
+static inline void get_config (Config *cfg, const char *filename) {
+FILE *f = fopen(filename, "r");
+if (!f) {
+strcpy(cfg->ip, "127.0.0.1");
+cfg->port = 8080;
+return;
+}
+
+if (fscanf(f, "%[^:]:%d", cfg->ip, &cfg->port) != 2) {
+strcpy(cfg->ip, "127.0.0.1");
+cfg->port = 8080;
+}
+fclose(f);
+}
+
+static inline void log_event (const char *tag, const char *msg) {
+FILE *f = fopen ("history.log", "a");
+if (!f) {
+return;
+}
+
+time_t now = time(NULL);
+struct tm *t = localtime(&now);
+char ts[25];
+strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", t);
+
+fprintf(f, "[%s] %s %s\n", ts, tag, msg);
+fclose(f);
+}
 
 #endif
+

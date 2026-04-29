@@ -1,0 +1,20 @@
+[2026-04-29 00:50:42] [System] [SERVER ONLINE]
+[2026-04-29 00:52:07] [System] [SERVER ONLINE]
+[2026-04-29 00:52:36] [System] User 'Gojo' connected
+[2026-04-29 00:53:14] [User] [Gojo]: hello Megumi
+[2026-04-29 00:54:57] [System] User 'Megumi' connected
+[2026-04-29 00:55:00] [User] [Megumi]: hello Gojo
+[2026-04-29 00:57:13] [System] User 'Megumi' disconnected
+[2026-04-29 00:57:37] [System] User 'Gojo' disconnected
+[2026-04-29 13:31:20] [System] [SERVER ONLINE]
+[2026-04-29 13:31:48] [System] Admin 'The Knights' connected
+[2026-04-29 13:31:57] [Admin] Active Users: 0
+[2026-04-29 13:32:02] [Admin] Server Uptime: 42 seconds
+[2026-04-29 13:32:04] [System] [EMERGENCY SHUTDOWN INITIATED]
+[2026-04-29 13:33:36] [System] [SERVER ONLINE]
+[2026-04-29 13:33:52] [System] User 'Gojo' connected
+[2026-04-29 13:33:58] [User] [Gojo]: Hello world..,
+[2026-04-29 13:34:16] [System] Admin 'The Knights' connected
+[2026-04-29 13:34:17] [Admin] Active Users: 1
+[2026-04-29 13:34:35] [Admin] Server Uptime: 59 seconds
+[2026-04-29 13:34:46] [System] [EMERGENCY SHUTDOWN INITIATED]

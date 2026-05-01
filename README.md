@@ -414,11 +414,6 @@ Cek perubahan pesan dari terminal Gojo:
 ![y](assets/Gojo2.png)
 
 
-Cek perubahan pesan dari terminal Megumi:
-
-![y](assets/Meg2.png)
-
-
 Cek perubahan pesan dari terminal server:
 
 ![y](assets/Srv2.png)

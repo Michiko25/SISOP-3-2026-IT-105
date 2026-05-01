@@ -389,3 +389,47 @@ Program mengambil identitas pengguna sebelum menentukan apakah dia User atau Adm
 
 
 ### 4. Hasil output dan cek tree
+Menjalankan server di terminal pertama:
+
+![y](assets/start.png)
+
+
+Tambah client di terminal yang berbeda:
+
+![y](assets/Gojo1.png)
+
+
+Tambah client di terminal yang berbeda:
+
+![y](assets/Meg1.png)
+
+
+Cek perubahan pesan di terminal server:
+
+![y](assets/Srv1.png)
+
+
+Cek perubahan pesan dari terminal Gojo:
+
+![y](assets/Gojo2.png)
+
+
+Cek perubahan pesan dari terminal Megumi:
+
+![y](assets/Meg2.png)
+
+
+Cek perubahan pesan dari terminal server:
+
+![y](assets/Srv2.png)
+
+
+Pilih opsi exit untuk client Gojo dan Megumi:
+
+![y](assets/Gojox.png)
+
+![y](assets/Megx.png)
+
+Tampilan pada terminal pertama (server):
+
+![y](assets/Srv3.png)

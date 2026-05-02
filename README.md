@@ -388,7 +388,9 @@ Program mengambil identitas pengguna sebelum menentukan apakah dia User atau Adm
 - ```if (strcmp ...```: client mendeteksi kata kunci khusus. Jika ditemukan, tipe pesan diubah menjadi 3 (logout) untuk memberi sinyal pada server agar menghapus data user terseut dari memori sebelum koneksi benar-benar ditutup. 
 
 
-### 4. Hasil output dan cek tree
+### 4. Hasil output
+
+(Hasil output interaksi antar client)
 Menjalankan server di terminal pertama:
 
 ![y](assets/start.png)
@@ -428,3 +430,455 @@ Pilih opsi exit untuk client Gojo dan Megumi:
 Tampilan pada terminal pertama (server):
 
 ![y](assets/Srv3.png)
+
+
+(Hasil output admin)
+Masukkan nama "Tke Knights" dan passwordnya (protocol7)
+
+![y](assets/Adm1.png)
+
+Active Users masih 0. Add client di terminal yang berbeda:
+
+![y](assets/addusr.png)
+
+Cek kembali jumlah active users di terminal admin:
+
+![y](assets/Adm_cek_usr.png)
+
+Terlihat jika admin memilih pilihan "Check Entities", ada 1 users yang active (Gojo).
+
+
+Jika admin memilih opsi 4 (Disconnect), tampilan di terminal server akan menjadi:
+
+![y](assets/Srv_adm_mati.png)
+
+
+Cek history log nya:
+
+![y](assets/history.png)
+
+
+### 5. Kendala
+
+
+## Soal 2
+### 1. Pengerjaan file ```arena.h``` (header)
+
+```c
+#define SHM_KEY 0x00001234 // memori bersama
+#define MSG_KEY 0x00005678 // antrean pesan (matchmaking)
+#define SEM_NAME "/eterion_gate" // nama semaphore sebagai gerbang pengunci
+```
+Menentukan identitas unik untuk jalur IPC.
+
+```c
+typedef struct {
+    char time[10];
+    char opponent[50];
+    char result[10]; // win or loss
+    int xp_gain;
+} BattleHistory;
+```
+Struktur data untuk mencatat setiap pertandingan.
+
+```c
+typedef struct {
+    char username[50];
+    char password[50];
+    int gold;
+    int lvl;
+    int xp;
+    int weapon_bonus;
+    int is_logged_in;
+    int in_match; // flag matchmaking
+    BattleHistory history[10]; 
+    int log_count;
+} User;
+```
+Struktur data untuk profile pemain. 
+
+```c
+typedef struct {
+    User players[MAX_USERS];
+} GameData;
+```
+Struktur yang membungkus array dari seluruh User. Struktur ini akan diletakkan di dalam shared memory agar semua proses bisa melihat data pemain yang sama secara real-time.
+
+```c
+struct msg_match {
+    long mtype;
+    int player_index;
+};
+
+void log_event (const char *tag, const char *msg);
+
+#endif
+```
+- ```struct msg_match```: format pesan untuk message queue.
+- ```log_event```: deklarasi fungsi pencatatan (di file ```orion.c```)
+
+### 2. Pengerjaan file ```orion.c``` (jalur komunikasi)
+
+```c
+#include "arena.h"
+
+void log_event (const char *tag, const char *msg) {
+    FILE *f = fopen ("history.log", "a");
+    if (!f) {
+        return;
+    }
+
+    time_t now = time(NULL);
+    fprintf (f, "[%ld] %s %s\n", now, tag, msg);
+    fclose(f);
+}
+```
+Fungsi ini bertugas mencatat setiap kejadian penting ke dalam history log. Mode append (a) untuk membuka file dalam mode tambah, ```time(NULL)``` mengambil waktu saat ini untuk dokumentasi log.
+
+```c
+int main() {
+    // 1. shared memory
+    int shmid= shmget(SHM_KEY, sizeof(GameData), IPC_CREAT | 0666);
+    GameData *data = (GameData *)shmat(shmid, NULL, 0);
+
+    if (data->players[0].gold == 0) {
+        memset(data, 0, sizeof(GameData));
+    }
+```
+- ```shmget```: membuat segmen memori bersama menggunakan ```SHM_KEY```. Ukurannya disesuaikan dengan ```GameData``` (50 data user).
+- ```IPC_CREAT | 0666```: membuat segmen baru jika belum ada dengan izin akses baca-tulis untuk semua user. 
+- ```shmat```: attach memori ke ruang alamat proses orion agar bisa diakses sbagai pointer. 
+- ```memset```: jika terdeteksi memori masih kosong (data pemain pertama emasnya 0), orion akan membersihkan seluruh blok memori untuk memastikan tidak ada data sampah saat awal dijalankan.
+
+```c
+    // 2. semaphore
+    sem_t *gate = sem_open(SEM_NAME, O_CREAT, 0666, 1);
+
+    // 3. message q
+    int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
+    printf ("Orion is ready (PID: %d)\n", getpid());
+
+    log_event("[System]", "SERVER ONLINE");
+```
+- ```sem_open```: membuat semaphore (```/eterion_gate```) dengan nilai awal 1 (gerbang terbuka), sehingga client pertama yang datang bisa langsung mengakses data. 
+- ```msgget```: membuat message queue menggunakan ```MSG_KEY```, digunakan oleh client utuk mengirimkan ID saat ingin matchmaking.
+- ```getpid()```: menampilkan ID proses orion di layar untuk keperluan monitoring sistem operasi. 
+
+```c
+    // orion stay alive agar IPC tidak hilang
+    while (1) {
+        sleep(10);
+    }
+
+    shmdt(data);
+    sem_close(gate);
+    return 0;
+}
+```
+- Server masuk ke perulangan tak terbatas (```while(1)```). Jika proses orion berhenti, sistem operasi bisa menganggap jalur IPC sudah tidak digunakan lagi dan menghapusnya, sehingga data game akan hilang. 
+- ```shmdt``` dan ```sem_close``` untuk mpembersihan yang secara teknis hanya akan tercapai jika perulanga di aras dihentikan paksa. 
+
+
+### 3. Pengerjaan ```eternal.c``` 
+
+```c
+// baca input tanpa enter (real-time battle)
+int getch() {
+    struct termios oldt, newt;
+    int chara;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    chara = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    return chara;
+}
+```
+Terminal Linux menunggu tombol enter sebelum mengirim data ke program. Fungsi ```getch()``` memanipulasi pengaturan terminal (```termios```) untuk mematikan mode ```ICANON``` (buffer baris) dan ```ECHO```. Hasilnya program bisa membaca satu tombol keyboard secara instan untuk mekanisme pertarungan real-time. 
+
+```c
+// tampilan profile
+void tampilkan_profile (User *u) {
+    printf("\n      PROFILE\n");
+    printf("Name : %-10s Lvl : %d\n", u->username, u->lvl);
+    printf("Gold : %-10d XP  : %d\n", u->gold, u->xp);
+    printf("---------------------------\n");
+}
+```
+Fungsi untuk tampilan profile (sederhana), mengambil data langsung dari User yang menunjuk ke shared memory.
+
+```c
+void fase_battle (User *player, User *enemy, int is_bot, sem_t *gate) {
+    int p_hp = 100, e_hp = 100;
+    int p_dmg = 10 + (player->xp / 50) + player->weapon_bonus;
+    int e_dmg = is_bot ? 10 : (enemy->xp / 50) + enemy->weapon_bonus;
+    time_t last_atk = 0;
+
+    printf ("\nBATTLE START against %s!\n", is_bot ? "Monster (Bot)" : enemy->username);
+
+    while (p_hp > 0 && e_hp > 0) {
+        printf ("\r\33[2K[YOU: %d/100] VS [%s: %d/100] | (a) Attack (u) Ulti ", p_hp, is_bot ? "BOT" : enemy->username, e_hp);
+        fflush(stdout);
+
+        char c = getch();
+        time_t now = time(NULL);
+
+        if (c == 'a' && difftime(now, last_atk) >= 1) {
+            e_hp -= p_dmg;
+            if (e_hp < 0) {
+                e_hp = 0;
+            }
+            last_atk = now;
+            p_hp -= e_dmg;
+        }
+        else if (c == 'u' && player->weapon_bonus > 0) {
+            e_hp -= (p_dmg * 3);
+            p_hp -= e_dmg;
+        }
+    }
+
+    // print 0/100
+    printf("\r\33[2K[YOU: %d/100] VS [%s: %d/100] | (a) Attack (u) Ulti", p_hp, is_bot ? "BOT" : enemy->username, e_hp);
+    fflush(stdout);
+
+    sem_wait(gate);
+    if (p_hp > 0) {
+        printf ("\nVICTORY!\n");
+        player->xp += 50; player->gold += 120;
+    }
+    else {
+        printf("\nDEFEAT!\n");
+        player->xp += 15; player->gold += 30;
+    }
+
+    player->lvl = 1 + (player->xp / 100);
+
+    int h_idx = player->log_count % 10;
+    time_t t = time(NULL);
+    struct tm *tm_info = localtime(&t);
+    strftime(player->history[h_idx].time, 10, "%H:%M", tm_info);
+    strcpy(player->history[h_idx].opponent, is_bot ? "Monster" : enemy->username);
+    strcpy(player->history[h_idx].result, p_hp > 0 ? "WIN" : "LOSS");
+
+    player->history[h_idx].xp_gain = p_hp > 0 ? 50 : 15;
+    player->log_count++;
+
+    sem_post(gate);
+}
+```
+- Kerusakan dipengaruhi oleh XP (setiap 50 XP menambah 1 damage) dan bonus senjata dai Armory.
+- while loop berfungsi agar pertarungan terus berjalan selama HP kedua pihak di atas 0. ```\33[2K``` untuk membersihkan baris di terminal agar status HP selalu ter-update di baris yang sama.
+- ```difftime(now, last_atk) >= 1``` memberi cooldown serangan biasa selama 1 detik agar pemain tidak bisa spam serangan. 
+- ```sem_wait(gate)``` dan ```(post)```: sebelum memberikan hadiah (gold/xp) dan mencatat riwayat, program mengunci shared memory agar data tidak bertabrakan dengan proses lain. 
+- Level dihitung ulang berdasarkan total XP (XP/100).
+
+```c
+// matchmaking 35 dtik
+void matchmaking (User *u, int msgid, GameData *data, sem_t *gate) {
+    struct msg_match mm;
+    mm.mtype = 1;
+    mm.player_index = -1;
+
+    printf ("Searching for an opponent... (35s)\n");
+    time_t start_m = time(NULL);
+    int found = 0;
+
+    while (difftime(time(NULL), start_m) < 35) {
+        if (msgrcv(msgid, &mm, sizeof(mm.player_index), 1, IPC_NOWAIT) != -1) { 
+            User *opponent = &data->players[mm.player_index];
+            if (!opponent->in_match) {
+                fase_battle(u, opponent, 0, gate);
+                found = 1;
+                break;
+            }
+        }
+
+        printf (".");
+        fflush(stdout);
+        sleep(1);
+    }
+
+    if (!found) {
+        printf ("\nOpponent not found. Fighting Monster (Bot)...\n");
+        fase_battle(u, NULL, 1, gate);
+    }
+}
+
+// armory
+void armory (User *u, sem_t *gate) {
+    printf ("\n--- ARMORY ---\n");
+    printf ("1. Wood Sword (100G) +5 Dmg\n2. Iron Sword (300G) +15 Dmg\n0. Back\nChoice: ");
+    int c;
+    scanf ("%d", &c);
+
+    sem_wait(gate);
+
+    if (c== 1 && u->gold >= 100) {
+        u->gold -= 100;
+        u->weapon_bonus = 5;
+    }
+    else if (c == 2 && u->gold >= 300) {
+        u->gold -= 300;
+        u->weapon_bonus = 15;
+    }
+
+    sem_post(gate);
+}
+```
+- ```msgrcv``` dengan ```IPC_NOWAIT```: program memeriksa apakah ada pesan di antrean matchmaking dengan cara non-blocking. Jika dalam 35 detik tidak ada pesan, pemain otomatis melawan bot.
+- ```armory```: pengecekan emas dan pemberian bonus senjata dilakukan di dalam blok semaphore agar gold tetap akurat.
+
+```c
+void menu_game (User *u, GameData *data, sem_t *gate, int msgid) {
+    int choice;
+    while(1) {
+        tampilkan_profile(u);
+        printf ("1. Battle\n2. Armory\n3. History\n4. Logout\n> Choice: ");
+        scanf ("%d", &choice);
+
+        if (choice == 1) {
+            matchmaking(u, msgid, data, gate);
+        }
+        else if (choice == 2) {
+            armory(u, gate);
+        }
+        else if (choice == 3) {
+            printf ("\n       MATCH HISTORY\n---------------------------------\n");
+            printf ("Time  | Opponent   | Res  | XP\n---------------------------------\n");
+            for (int i = 0; i < 10; i++) {
+                if (u->history[i].time[0] != '\0') {
+                    printf ("%-5s | %-10s | %-4s | +%d XP\n", u->history[i].time, u->history[i].opponent, u->history[i].result, u->history[i].xp_gain);
+                }
+            }
+            printf ("---------------------------------\nPress any key to back...");
+            getch();
+        }
+        else if (choice == 4) {
+            sem_wait(gate);
+            u->is_logged_in = 0;
+            sem_post(gate);
+            break;
+        }
+    }
+}
+
+void main_menu (GameData *data, sem_t *gate, int msgid) {
+    int choice;
+    User *logged_in_user = NULL;
+
+    while (1) {
+        printf("\n1. Register\n2. Login\n3. Exit\nChoice: ");
+        scanf("%d", &choice);
+
+        if (choice == 1) {
+            char u[50], p[50];
+            printf ("\nCREATE ACCOUNT\n");
+            printf("Username: ");
+            scanf("%s", u);
+            printf("Password: "); 
+            scanf("%s", p);
+
+            sem_wait(gate); // lock shared mem
+            int found = 0;
+            for (int i = 0; i < MAX_USERS; i++) {
+                if (strcmp(data->players[i].username, u) == 0) {
+                    found = 1;
+                    break;
+                }
+            }
+
+            if (found) {
+                printf ("Username sudah didaftarkan!\n");
+            }
+            else {
+                for (int i = 0; i < MAX_USERS; i++) {
+                    if (data->players[i].username[0] == '\0') {
+                        strcpy(data->players[i].username, u);
+                        strcpy(data->players[i].password, p);
+                        data->players[i].gold = 150;
+                        data->players[i].lvl = 1;
+                        data->players[i].xp = 0;
+                        data->players[i].is_logged_in = 0;
+                        printf ("Account created!\n");
+                        break;
+                    }
+                }
+            }
+            sem_post(gate); // unlock
+        }
+        else if (choice == 2) {
+            char u[50], p[50];
+            printf ("\nLOGIN\n");
+            printf ("Username: ");
+            scanf("%s", u);
+            printf("Password: ");
+            scanf("%s", p);
+
+            sem_wait(gate);
+            int success = 0;
+            for (int i = 0; i < MAX_USERS; i++) {
+                if (strcmp(data->players[i].username, u) == 0 &&
+                    strcmp(data->players[i].password, p) == 0) {
+                    if (data->players[i].is_logged_in) {
+                        printf("Akun sedang aktif di sesi lain!\n");
+                    }
+                    else {
+                        data->players[i].is_logged_in = 1;
+                        logged_in_user = &data->players[i];
+                        success = 1;
+                    }
+                    break;
+                }
+            }
+            sem_post(gate);
+
+            if (success) {
+                printf ("Welcome!\n");
+                menu_game (logged_in_user, data, gate, msgid);
+            }
+            else {
+                printf("Username atau password salah!\n");
+            }
+        }
+        else {
+            break;
+        }
+    }
+}
+```
+- Register: mengecek seluruh daftar user di shared memory untuk memastikan nama belum terpakai sebelum menyimpan data akun baru.
+- Login: mencocokkan input dengan data di memori dan mengecek flag ```is_logged_in``` untuk mencegah satu akun login di 2 terminal berbeda secara bersamaan. 
+
+```c
+int main() {
+    int shmid = shmget(SHM_KEY, sizeof(GameData), 0666);
+    int msgid = msgget(MSG_KEY, 0666);
+
+    if (shmid < 0 || msgid < 0) {
+        printf ("Orion are you there?\n");
+        return 1;
+    }
+
+    GameData *data = (GameData *) shmat(shmid, NULL, 0);
+    sem_t *gate = sem_open(SEM_NAME, 0);
+
+    main_menu(data, gate, msgid);
+
+    shmdt(data);
+    sem_close(gate);
+    return 0;
+}
+```
+- ```shmget``` dan ```msgget```: eternal hanya mengambil ID dari jalur yang sudah ada. 
+- ```if (shmid < 0 || msgid < 0)```: jika orion belum dijalankan, eternal akan mendeteksi jika kunci IPS tidak ditemukan dan mencetak pesan kemudian berhenti secara aman daripada memaksa akses.
+- ```shmat``` dan ```sem_open```: menempelkan memori bersama ke variabel ```data``` dan membuka akses ke sempahore ```/eterion_gate```.
+- Setelah semua koneksi siap, program memanggil ```main_menu``` untuk memulai interaksi pemain. Setelah user keluar dari game, ```shmdt``` melepaskan memori dan ```sem_close``` menutup akses.
+
+
+### 4. Makefile
+File instruksi yang digunakan oleh tool ```make``` untuk mengotomatisasi proses kompilasi kode sumber menjadi program yang siap dijalankan. Berguna agar tidak perlu mengetik compile berulang kali ke tiap file.
+
+### 5.Hasil output
+
+### 6. Kendala

@@ -461,6 +461,7 @@ Cek history log nya:
 ### 5. Kendala
 
 
+
 ## Soal 2
 ### 1. Pengerjaan file ```arena.h``` (header)
 
@@ -880,5 +881,35 @@ int main() {
 File instruksi yang digunakan oleh tool ```make``` untuk mengotomatisasi proses kompilasi kode sumber menjadi program yang siap dijalankan. Berguna agar tidak perlu mengetik compile berulang kali ke tiap file.
 
 ### 5.Hasil output
+Compile file menggunakan command ```make```
+
+![y](assets/compile.png)
+
+
+Jalankan file ```orion.c```
+
+![y](assets/start2.png)
+
+
+Registrasi dan login user di terminal lain:
+
+![y](assets/gregist.png)
+
+
+Perang pertama dengan bot setelah menunggu 35 detik tidak ada user lain yang mengajak bertanding. User masih pemula sehingga belum punya armory untuk ulti, hanya bisa attack
+
+![y](assets/fnewbie.png)
+
+
+Setelah perang dengan bot, user mendapatkan gold. User membeli tool di armory
+
+![y](assets/fbeli.png)
+
+
+User kembali perang dengan bot menggunakan ulti dengan damage yang lebih besar 
+
+![y](assets/fulti.png)
+
+
 
 ### 6. Kendala

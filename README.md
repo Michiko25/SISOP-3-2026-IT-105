@@ -459,7 +459,10 @@ Cek history log nya:
 
 
 ### 5. Kendala
+Kendala clean up: 
+Saat membuat logika user bisa masuk dan chat, saya lupa menambahkan logika untuk menghapus user dari array ```clients``` di server saat user keluar atau koneksi terputus. Saat user yang sama mencoba login kembali, sever menolak atau slot array dianggap penuh padahal user sebelumnya sudah tidak aktif. Maka solusinya pada ```while(recv..)``` berhenti, wajib memanggil ```free(clients[index])``` dan set pointer kembali ke ```NULL``` agar slotnya bisa dipakai lagi. 
 
+Kemudian terjadi beberapa kali kesalahan pengetikan (typo).
 
 
 ## Soal 2
@@ -911,5 +914,10 @@ User kembali perang dengan bot menggunakan ulti dengan damage yang lebih besar
 ![y](assets/fulti.png)
 
 
-
 ### 6. Kendala
+Awalnya saat user akan menekan tombol a atau u untuk melawan, tampilan yang awalnya "Ulti" menjadi "Ultiti", karakter baru dari baris status yang di update muncul menimpa teks lama tanpa menghapus sepenuhnya. Untuk mengatasinya, saya menambahkan kode ```\33[2K``` sebelum mencetak status HP yang baru. Kode tersebut memerintahkan terminal untuk menghapus seluruh baris terlebih dahulu sebelum teks baru dicetak. 
+
+![y](assets/ultiti.png)
+
+
+Kemudian terdapat kendala kesalahan pengetikan (typo) dan telah diperbaiki.
